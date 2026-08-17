@@ -3,6 +3,12 @@ package neunix.dailychunk.data
 import android.content.Context
 import androidx.room.Room
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import neunix.dailychunk.download.DownloadEngine
 import okhttp3.OkHttpClient
 
@@ -11,6 +17,12 @@ object AppContainer {
         private set
     lateinit var repository: DownloadRepository
         private set
+    lateinit var preferencesRepository: UserPreferencesRepository
+        private set
+    lateinit var prefsState: StateFlow<AppPreferences>
+        private set
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @Volatile private var initialized = false
 
@@ -28,6 +40,9 @@ object AppContainer {
                 .build()
             val engine = DownloadEngine(client)
             repository = DownloadRepository(database.downloadDao(), engine)
+            preferencesRepository = UserPreferencesRepository(appContext)
+            prefsState = preferencesRepository.preferences
+                .stateIn(appScope, SharingStarted.Eagerly, AppPreferences())
             initialized = true
         }
     }

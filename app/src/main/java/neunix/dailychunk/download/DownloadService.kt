@@ -13,7 +13,10 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 import neunix.dailychunk.data.AppContainer
 import neunix.dailychunk.data.DownloadStatus
+import neunix.dailychunk.data.QueueManager
 import neunix.dailychunk.notification.Notifications
+import neunix.dailychunk.util.FilePublisher
+import neunix.dailychunk.util.NetworkUtils
 import neunix.dailychunk.work.Scheduler
 import okhttp3.OkHttpClient
 
@@ -60,6 +63,7 @@ class DownloadService : LifecycleService() {
                     runDownload(id)
                 } finally {
                     runningJobs--
+                    QueueManager.tryStartNext(applicationContext)
                     if (runningJobs <= 0) {
                         stopForeground(Service.STOP_FOREGROUND_REMOVE)
                         stopSelf()
@@ -75,6 +79,20 @@ class DownloadService : LifecycleService() {
         val repo = AppContainer.repository
         var download = repo.getById(id) ?: return
         if (download.status == DownloadStatus.COMPLETED || download.status == DownloadStatus.CANCELLED) return
+
+        val prefs = AppContainer.prefsState.value
+
+        if (prefs.wifiOnly && !NetworkUtils.isWifiConnected(applicationContext)) {
+            repo.update(
+                download.copy(
+                    status = DownloadStatus.RETRYING,
+                    errorMessage = "Waiting for Wi-Fi",
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            Scheduler.scheduleCycle(applicationContext, id, 5 * 60_000L)
+            return
+        }
 
         val engine = DownloadEngine(serviceClient)
         activeEngines[id] = engine
@@ -112,18 +130,33 @@ class DownloadService : LifecycleService() {
         val latest = repo.getById(id) ?: return
         when (result) {
             is DownloadEngine.CycleResult.Completed -> {
-                val finalSize = File(latest.destinationPath).let { if (it.exists()) it.length() else latest.downloadedBytes }
-                repo.update(
-                    latest.copy(
-                        status = DownloadStatus.COMPLETED,
-                        downloadedBytes = finalSize,
-                        totalBytes = if (latest.totalBytes > 0) latest.totalBytes else finalSize,
-                        nextCycleAtMillis = 0L,
-                        retryCount = 0,
-                        updatedAt = System.currentTimeMillis()
+                val workFile = File(latest.destinationPath)
+                val finalSize = if (workFile.exists()) workFile.length() else latest.downloadedBytes
+                val published = FilePublisher.publish(applicationContext, workFile, latest.fileName, latest.mimeType)
+                if (published) {
+                    workFile.delete()
+                    repo.update(
+                        latest.copy(
+                            status = DownloadStatus.COMPLETED,
+                            downloadedBytes = finalSize,
+                            totalBytes = if (latest.totalBytes > 0) latest.totalBytes else finalSize,
+                            nextCycleAtMillis = 0L,
+                            retryCount = 0,
+                            errorMessage = null,
+                            updatedAt = System.currentTimeMillis()
+                        )
                     )
-                )
-                Notifications.showCompleted(this, latest.fileName, id)
+                    if (prefs.notificationsEnabled) Notifications.showCompleted(this, latest.fileName, id)
+                } else {
+                    repo.update(
+                        latest.copy(
+                            status = DownloadStatus.FAILED,
+                            errorMessage = "Could not save file to Downloads. Check storage permission and free space.",
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                    if (prefs.notificationsEnabled) Notifications.showFailed(this, latest.fileName, "Could not save file", id)
+                }
             }
             is DownloadEngine.CycleResult.CycleLimitReached -> {
                 val nextAt = System.currentTimeMillis() + latest.cycleIntervalMillis
@@ -136,7 +169,7 @@ class DownloadService : LifecycleService() {
                     )
                 )
                 Scheduler.scheduleCycle(applicationContext, id, latest.cycleIntervalMillis)
-                Notifications.showWaiting(this, latest.fileName, latest.cycleIntervalMillis, id)
+                if (prefs.notificationsEnabled) Notifications.showWaiting(this, latest.fileName, latest.cycleIntervalMillis, id)
             }
             is DownloadEngine.CycleResult.ManuallyPaused -> {
                 repo.update(latest.copy(status = DownloadStatus.PAUSED_MANUAL, updatedAt = System.currentTimeMillis()))
@@ -162,7 +195,7 @@ class DownloadService : LifecycleService() {
                             updatedAt = System.currentTimeMillis()
                         )
                     )
-                    Notifications.showFailed(this, latest.fileName, result.message, id)
+                    if (prefs.notificationsEnabled) Notifications.showFailed(this, latest.fileName, result.message, id)
                 }
             }
         }

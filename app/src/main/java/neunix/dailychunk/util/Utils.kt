@@ -1,5 +1,8 @@
 package neunix.dailychunk.util
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 
 object Formatters {
@@ -23,6 +26,11 @@ object Formatters {
         val minutes = totalMinutes % 60
         return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
     }
+
+    fun formatDate(millis: Long): String {
+        val fmt = java.text.SimpleDateFormat("MMM d, yyyy • h:mm a", java.util.Locale.getDefault())
+        return fmt.format(java.util.Date(millis))
+    }
 }
 
 object FileUtils {
@@ -41,5 +49,14 @@ object FileUtils {
         } catch (e: Exception) {
             "download_${System.currentTimeMillis()}"
         }
+    }
+}
+
+object NetworkUtils {
+    fun isWifiConnected(context: Context): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 }

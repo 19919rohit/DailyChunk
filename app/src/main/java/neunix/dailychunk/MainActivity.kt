@@ -8,10 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import neunix.dailychunk.data.AppContainer
 import neunix.dailychunk.ui.DailyChunkNavHost
 import neunix.dailychunk.ui.theme.DailyChunkTheme
+import neunix.dailychunk.ui.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,7 +28,10 @@ class MainActivity : ComponentActivity() {
         val initialId = intent?.getLongExtra("downloadId", -1L) ?: -1L
 
         setContent {
-            DailyChunkTheme {
+            val prefs by AppContainer.prefsState.collectAsState()
+            val mode = try { ThemeMode.valueOf(prefs.themeMode) } catch (e: Exception) { ThemeMode.LIGHT }
+
+            DailyChunkTheme(mode = mode) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     DailyChunkNavHost(initialDownloadId = if (initialId > 0) initialId else null)
                 }

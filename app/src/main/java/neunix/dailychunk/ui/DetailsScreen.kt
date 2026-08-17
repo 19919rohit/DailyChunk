@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -23,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +45,8 @@ import neunix.dailychunk.util.Formatters
 fun DetailsScreen(viewModel: DownloadViewModel, downloadId: Long, onBack: () -> Unit) {
     val download by viewModel.observe(downloadId).collectAsState(initial = null)
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         while (true) {
             delay(30_000)
@@ -89,9 +93,9 @@ fun DetailsScreen(viewModel: DownloadViewModel, downloadId: Long, onBack: () -> 
                     InfoRow("Next cycle", Formatters.formatDuration((d.nextCycleAtMillis - now).coerceAtLeast(0)))
                 }
                 InfoRow("Resume support", if (d.supportsRange) "Supported" else "Not confirmed")
-                InfoRow("Destination", d.destinationPath)
+                InfoRow("Saved to", "Download / Daily Chunk / ${d.fileName}")
                 InfoRow("URL", d.url)
-                if (d.errorMessage != null) InfoRow("Error", d.errorMessage)
+                if (d.errorMessage != null) InfoRow("Status detail", d.errorMessage)
 
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -104,9 +108,31 @@ fun DetailsScreen(viewModel: DownloadViewModel, downloadId: Long, onBack: () -> 
                     if (d.status != DownloadStatus.COMPLETED && d.status != DownloadStatus.CANCELLED) {
                         OutlinedButton(onClick = { viewModel.cancel(d); onBack() }) { Text("Cancel") }
                     }
-                    OutlinedButton(onClick = { viewModel.delete(d); onBack() }) { Text("Delete") }
+                    OutlinedButton(onClick = { showDeleteDialog = true }) { Text("Delete") }
                 }
             }
+        }
+
+        if (showDeleteDialog && d != null) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Delete download") },
+                text = { Text("Remove \"${d.fileName}\" from DailyChunk? You can also delete the saved file.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.delete(d, deleteFile = true)
+                        showDeleteDialog = false
+                        onBack()
+                    }) { Text("Delete file too", color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        viewModel.delete(d, deleteFile = false)
+                        showDeleteDialog = false
+                        onBack()
+                    }) { Text("Keep file") }
+                }
+            )
         }
     }
 }
