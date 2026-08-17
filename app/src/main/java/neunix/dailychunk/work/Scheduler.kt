@@ -44,7 +44,7 @@ object Scheduler {
         val request = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(data)
             .setConstraints(networkConstraint())
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WHEN_QUOTA_EXCEEDED)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag(workName(id))
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(workName(id), ExistingWorkPolicy.REPLACE, request)
