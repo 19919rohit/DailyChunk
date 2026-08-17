@@ -178,4 +178,29 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun cancel(d: DownloadEntity) = viewModelScope.launch {
-        val context = getApplicat
+        val context = getApplication<Application>()
+        DownloadService.requestPause(d.id)
+        Scheduler.cancel(context, d.id)
+        File(d.destinationPath).delete()
+        repo.update(d.copy(status = DownloadStatus.CANCELLED, updatedAt = System.currentTimeMillis()))
+    }
+
+    fun delete(d: DownloadEntity, deleteFile: Boolean = false) = viewModelScope.launch {
+        val context = getApplication<Application>()
+        DownloadService.requestPause(d.id)
+        Scheduler.cancel(context, d.id)
+        File(d.destinationPath).delete()
+        if (deleteFile) {
+            filesRepo.deleteByName(d.fileName)
+            refreshFiles()
+        }
+        repo.delete(d)
+    }
+
+    fun setThemeMode(mode: String) = viewModelScope.launch { prefsRepo.setThemeMode(mode) }
+    fun setWifiOnly(value: Boolean) = viewModelScope.launch { prefsRepo.setWifiOnly(value) }
+    fun setNotificationsEnabled(value: Boolean) = viewModelScope.launch { prefsRepo.setNotificationsEnabled(value) }
+    fun setDefaultCycleAmountMb(value: Float) = viewModelScope.launch { prefsRepo.setDefaultCycleAmountMb(value) }
+    fun setDefaultInterval(value: Long, unit: IntervalUnit) = viewModelScope.launch { prefsRepo.setDefaultInterval(value, unit) }
+    fun setMaxConcurrentDownloads(value: Int) = viewModelScope.launch { prefsRepo.setMaxConcurrentDownloads(value) }
+}
