@@ -1,0 +1,36 @@
+DailyChunk is a simple, free and open-source download manager for Android that lets you download large files gradually when you have limited or metered mobile data.
+
+Have a 4 GB file but only 100 MB of data available each day? Set your cycle limit to 100 MB, and DailyChunk will:
+
+• Download your allowed amount
+• Stop automatically when the limit is reached
+• Wait for the next scheduled cycle
+• Resume exactly where it stopped
+• Continue automatically until the file is complete
+
+You can choose the amount downloaded per cycle and the time between cycles, using minutes or hours. Downloads can start immediately or wait for the next cycle.
+
+Features:
+
+• Data-aware downloading — control how much data each cycle can use
+• Automatic resume — continues from where the previous cycle stopped
+• Automatic scheduling — downloads, waits, and continues without manual intervention
+• Connection-aware — waits for an internet connection instead of unnecessarily failing
+• Multiple downloads — manage several scheduled downloads
+• Live progress — view progress, speed, cycle usage, and next-cycle timing
+• Built-in file manager — open, share, rename, or delete downloaded files
+• Download history — keep track of completed, failed, and cancelled downloads
+• Notifications — receive progress, completion, and error notifications
+• Wi-Fi-only mode
+• Light, dark, and system themes
+• Background downloading
+• No ads
+• No trackers
+• No analytics or personal-data collection
+• 100% free and open source
+
+Downloaded files are stored in the regular Download/Daily Chunk folder, so they remain accessible through your normal file manager.
+
+DailyChunk is designed for one simple problem: when you can't download everything today, download a little today and let the app finish it for you.
+
+Open source • Free forever • No tracking
