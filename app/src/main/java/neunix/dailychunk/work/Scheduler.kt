@@ -66,6 +66,10 @@ object Scheduler {
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(workName(id), ExistingWorkPolicy.REPLACE, request)
     }
+    
+    fun scheduleCycle(context: Context, id: Long, delayMillis: Long) {
+    scheduleDelayed(context, id, delayMillis)
+}
 
     fun cancel(context: Context, id: Long) {
         WorkManager.getInstance(context).cancelUniqueWork(workName(id))
