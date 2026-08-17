@@ -2,14 +2,16 @@ package neunix.dailychunk.data
 
 import android.content.Context
 import kotlinx.coroutines.flow.first
-import neunix.dailychunk.download.DownloadService
+import neunix.dailychunk.work.Scheduler
 
 /**
- * A deliberately simple queue: at most `maxConcurrentDownloads` downloads may be
- * DOWNLOADING at once. Anything else waits in QUEUED until a slot frees up.
+ * At most maxConcurrentDownloads may be DOWNLOADING at once (no upper cap —
+ * whatever the user sets in Settings, including arbitrarily large custom
+ * values). Anything else waits in QUEUED until a slot frees up.
  */
 object QueueManager {
 
+    @Synchronized
     suspend fun tryStartNext(context: Context) {
         val prefs = AppContainer.prefsState.value
         val all = AppContainer.repository.observeAll().first()
@@ -19,13 +21,12 @@ object QueueManager {
         val next = all.filter { it.status == DownloadStatus.QUEUED }
             .minByOrNull { it.createdAt } ?: return
 
-        DownloadService.start(context, next.id)
-    }
-
-    suspend fun hasFreeSlot(context: Context): Boolean {
-        val prefs = AppContainer.prefsState.value
-        val activeCount = AppContainer.repository.observeAll().first()
-            .count { it.status == DownloadStatus.DOWNLOADING }
-        return activeCount < prefs.maxConcurrentDownloads
+        // Optimistically claim the slot before the worker actually starts,
+        // so a burst of calls to tryStartNext (e.g. several downloads
+        // finishing at once) can't all see the same free slot and over-enqueue.
+        AppContainer.repository.update(
+            next.copy(status = DownloadStatus.DOWNLOADING, updatedAt = System.currentTimeMillis())
+        )
+        Scheduler.startNow(context, next.id)
     }
 }

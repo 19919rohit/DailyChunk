@@ -1,5 +1,10 @@
 package neunix.dailychunk.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
@@ -20,7 +25,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -29,7 +33,15 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
-private data class BottomDest(val route: String, val label: String, val filled: androidx.compose.ui.graphics.vector.ImageVector, val outline: androidx.compose.ui.graphics.vector.ImageVector)
+private const val FAST_MS = 160
+private const val FASTER_MS = 100
+
+private data class BottomDest(
+    val route: String,
+    val label: String,
+    val filled: androidx.compose.ui.graphics.vector.ImageVector,
+    val outline: androidx.compose.ui.graphics.vector.ImageVector
+)
 
 private val bottomDestinations = listOf(
     BottomDest("home", "Home", Icons.Filled.CloudDownload, Icons.Outlined.CloudDownload),
@@ -51,7 +63,6 @@ fun DailyChunkNavHost(initialDownloadId: Long?) {
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-
     val showBottomBar = bottomDestinations.any { it.route == currentRoute }
 
     Scaffold(
@@ -80,37 +91,35 @@ fun DailyChunkNavHost(initialDownloadId: Long?) {
         NavHost(
             navController = navController,
             startDestination = "home",
-            modifier = Modifier.padding(padding)
+            modifier = Modifier.padding(padding),
+            enterTransition = { fadeIn(tween(FASTER_MS)) },
+            exitTransition = { fadeOut(tween(FASTER_MS)) }
         ) {
             composable("home") {
-                HomeScreen(
-                    viewModel = viewModel,
-                    onAddClick = { navController.navigate("add") },
-                    onOpenDetails = { id -> navController.navigate("details/$id") }
-                )
+                HomeScreen(viewModel, onAddClick = { navController.navigate("add") }, onOpenDetails = { id -> navController.navigate("details/$id") })
             }
-            composable("history") {
-                HistoryScreen(viewModel = viewModel, onOpenDetails = { id -> navController.navigate("details/$id") })
-            }
-            composable("files") {
-                FilesScreen(viewModel = viewModel)
-            }
-            composable("settings") {
-                SettingsScreen(viewModel = viewModel)
-            }
-            composable("add") {
-                AddDownloadScreen(
-                    viewModel = viewModel,
-                    onDone = { navController.popBackStack() },
-                    onBack = { navController.popBackStack() }
-                )
+            composable("history") { HistoryScreen(viewModel, onOpenDetails = { id -> navController.navigate("details/$id") }) }
+            composable("files") { FilesScreen(viewModel) }
+            composable("settings") { SettingsScreen(viewModel) }
+            composable(
+                "add",
+                enterTransition = { slideInHorizontally(tween(FAST_MS), initialOffsetX = { it / 5 }) + fadeIn(tween(FAST_MS)) },
+                exitTransition = { fadeOut(tween(FASTER_MS)) },
+                popEnterTransition = { fadeIn(tween(FASTER_MS)) },
+                popExitTransition = { slideOutHorizontally(tween(FAST_MS), targetOffsetX = { it / 5 }) + fadeOut(tween(FAST_MS)) }
+            ) {
+                AddDownloadScreen(viewModel, onDone = { navController.popBackStack() }, onBack = { navController.popBackStack() })
             }
             composable(
                 "details/{id}",
-                arguments = listOf(navArgument("id") { type = NavType.LongType })
+                arguments = listOf(navArgument("id") { type = NavType.LongType }),
+                enterTransition = { slideInHorizontally(tween(FAST_MS), initialOffsetX = { it / 5 }) + fadeIn(tween(FAST_MS)) },
+                exitTransition = { fadeOut(tween(FASTER_MS)) },
+                popEnterTransition = { fadeIn(tween(FASTER_MS)) },
+                popExitTransition = { slideOutHorizontally(tween(FAST_MS), targetOffsetX = { it / 5 }) + fadeOut(tween(FAST_MS)) }
             ) { entry ->
                 val id = entry.arguments?.getLong("id") ?: -1L
-                DetailsScreen(viewModel = viewModel, downloadId = id, onBack = { navController.popBackStack() })
+                DetailsScreen(viewModel, downloadId = id, onBack = { navController.popBackStack() })
             }
         }
     }

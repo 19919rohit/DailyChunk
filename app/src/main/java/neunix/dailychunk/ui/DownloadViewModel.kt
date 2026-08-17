@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import neunix.dailychunk.data.AppContainer
@@ -20,7 +19,7 @@ import neunix.dailychunk.data.IntervalUnit
 import neunix.dailychunk.data.ManagedFile
 import neunix.dailychunk.data.QueueManager
 import neunix.dailychunk.download.AnalyzeResult
-import neunix.dailychunk.download.DownloadService
+import neunix.dailychunk.download.DownloadWorker
 import neunix.dailychunk.util.FileUtils
 import neunix.dailychunk.work.Scheduler
 
@@ -40,14 +39,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     val downloads: StateFlow<List<DownloadEntity>> = repo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val activeDownloads: StateFlow<List<DownloadEntity>> = downloads
-        .combine(downloads) { list, _ -> list }
-        .let { flow ->
-            flow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        }
-
     val historyDownloads: StateFlow<List<DownloadEntity>> = downloads
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val preferences: StateFlow<AppPreferences> = AppContainer.prefsState
 
@@ -61,23 +53,15 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun refreshFiles() {
-        viewModelScope.launch {
-            _files.value = filesRepo.listFiles()
-        }
+        viewModelScope.launch { _files.value = filesRepo.listFiles() }
     }
 
     fun deleteFile(file: ManagedFile) {
-        viewModelScope.launch {
-            filesRepo.delete(file)
-            refreshFiles()
-        }
+        viewModelScope.launch { filesRepo.delete(file); refreshFiles() }
     }
 
     fun renameFile(file: ManagedFile, newName: String) {
-        viewModelScope.launch {
-            filesRepo.rename(file, newName)
-            refreshFiles()
-        }
+        viewModelScope.launch { filesRepo.rename(file, newName); refreshFiles() }
     }
 
     private val _analyzeState = MutableStateFlow<AnalyzeUiState>(AnalyzeUiState.Idle)
@@ -97,13 +81,6 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
         _analyzeState.value = AnalyzeUiState.Idle
     }
 
-    
-    /**
-     * cycleAmountMb supports fractional values (e.g. 3.5 MB per cycle).
-     * intervalValue + intervalUnit lets the user pick minutes or hours.
-     * startImmediately=false queues the download but defers the first
-     * cycle until one full interval from now, instead of downloading now.
-     */
     fun addDownload(
         url: String,
         fileName: String,
@@ -153,7 +130,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
             if (startImmediately) {
                 QueueManager.tryStartNext(context)
             } else {
-                Scheduler.scheduleCycle(context, id, intervalMillis)
+                Scheduler.scheduleDelayed(context, id, intervalMillis)
             }
         }
     }
@@ -161,7 +138,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     fun pause(d: DownloadEntity) = viewModelScope.launch {
         val context = getApplication<Application>()
         when (d.status) {
-            DownloadStatus.DOWNLOADING -> DownloadService.requestPause(d.id)
+            DownloadStatus.DOWNLOADING -> DownloadWorker.requestPause(d.id)
             DownloadStatus.WAITING_NEXT_CYCLE, DownloadStatus.QUEUED, DownloadStatus.RETRYING -> {
                 Scheduler.cancel(context, d.id)
                 repo.update(d.copy(status = DownloadStatus.PAUSED_MANUAL, updatedAt = System.currentTimeMillis()))
@@ -190,7 +167,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
 
     fun cancel(d: DownloadEntity) = viewModelScope.launch {
         val context = getApplication<Application>()
-        DownloadService.requestPause(d.id)
+        DownloadWorker.requestPause(d.id)
         Scheduler.cancel(context, d.id)
         File(d.destinationPath).delete()
         repo.update(d.copy(status = DownloadStatus.CANCELLED, updatedAt = System.currentTimeMillis()))
@@ -198,7 +175,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
 
     fun delete(d: DownloadEntity, deleteFile: Boolean = false) = viewModelScope.launch {
         val context = getApplication<Application>()
-        DownloadService.requestPause(d.id)
+        DownloadWorker.requestPause(d.id)
         Scheduler.cancel(context, d.id)
         File(d.destinationPath).delete()
         if (deleteFile) {
@@ -213,5 +190,9 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     fun setNotificationsEnabled(value: Boolean) = viewModelScope.launch { prefsRepo.setNotificationsEnabled(value) }
     fun setDefaultCycleAmountMb(value: Float) = viewModelScope.launch { prefsRepo.setDefaultCycleAmountMb(value) }
     fun setDefaultInterval(value: Long, unit: IntervalUnit) = viewModelScope.launch { prefsRepo.setDefaultInterval(value, unit) }
-    fun setMaxConcurrentDownloads(value: Int) = viewModelScope.launch { prefsRepo.setMaxConcurrentDownloads(value) }
+
+    /** No upper cap — the user can set any positive number via the Custom option. */
+    fun setMaxConcurrentDownloads(value: Int) = viewModelScope.launch {
+        prefsRepo.setMaxConcurrentDownloads(value.coerceAtLeast(1))
+    }
 }

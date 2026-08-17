@@ -34,10 +34,12 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".download.DownloadService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false" />
+        <!-- No custom download Service needed anymore: DownloadWorker promotes
+             itself to a foreground job via setForeground(), which WorkManager
+             backs with its own SystemForegroundService (merged automatically
+             from the androidx.work manifest). This is the sanctioned path for
+             starting foreground work from a background-triggered job on
+             Android 12+, and it's what fixed unreliable startup. -->
 
         <receiver
             android:name=".work.BootReceiver"
