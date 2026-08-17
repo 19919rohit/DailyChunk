@@ -97,9 +97,12 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
         _analyzeState.value = AnalyzeUiState.Idle
     }
 
+    
     /**
      * cycleAmountMb supports fractional values (e.g. 3.5 MB per cycle).
      * intervalValue + intervalUnit lets the user pick minutes or hours.
+     * startImmediately=false queues the download but defers the first
+     * cycle until one full interval from now, instead of downloading now.
      */
     fun addDownload(
         url: String,
@@ -109,7 +112,8 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
         mimeType: String?,
         cycleAmountMb: Float,
         intervalValue: Long,
-        intervalUnit: IntervalUnit
+        intervalUnit: IntervalUnit,
+        startImmediately: Boolean = true
     ) {
         viewModelScope.launch {
             val context = getApplication<Application>()
@@ -125,6 +129,9 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
                 IntervalUnit.HOURS -> intervalValue * 3_600_000L
             }.coerceAtLeast(60_000L)
 
+            val status = if (startImmediately) DownloadStatus.QUEUED else DownloadStatus.WAITING_NEXT_CYCLE
+            val nextCycleAt = if (startImmediately) 0L else now + intervalMillis
+
             val entity = DownloadEntity(
                 url = url,
                 fileName = safeFileName,
@@ -134,16 +141,20 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
                 cycleLimitBytes = cycleLimitBytes,
                 cycleUsedBytes = 0L,
                 cycleIntervalMillis = intervalMillis,
-                nextCycleAtMillis = 0L,
-                status = DownloadStatus.QUEUED,
+                nextCycleAtMillis = nextCycleAt,
+                status = status,
                 supportsRange = supportsRange,
                 mimeType = mimeType,
                 errorMessage = null,
                 createdAt = now,
                 updatedAt = now
             )
-            repo.insert(entity)
-            QueueManager.tryStartNext(context)
+            val id = repo.insert(entity)
+            if (startImmediately) {
+                QueueManager.tryStartNext(context)
+            } else {
+                Scheduler.scheduleCycle(context, id, intervalMillis)
+            }
         }
     }
 

@@ -10,6 +10,8 @@ import androidx.lifecycle.lifecycleScope
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.random.Random
 import kotlinx.coroutines.launch
 import neunix.dailychunk.data.AppContainer
 import neunix.dailychunk.data.DownloadStatus
@@ -18,6 +20,7 @@ import neunix.dailychunk.notification.Notifications
 import neunix.dailychunk.util.FilePublisher
 import neunix.dailychunk.util.NetworkUtils
 import neunix.dailychunk.work.Scheduler
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 
 class DownloadService : LifecycleService() {
@@ -25,6 +28,7 @@ class DownloadService : LifecycleService() {
     companion object {
         const val ACTION_START = "neunix.dailychunk.action.START"
         const val EXTRA_ID = "extra_download_id"
+        private const val MAX_TRANSIENT_RETRIES = 8
         private val activeEngines = ConcurrentHashMap<Long, DownloadEngine>()
 
         fun start(context: Context, id: Long) {
@@ -38,16 +42,31 @@ class DownloadService : LifecycleService() {
         fun requestPause(id: Long) {
             activeEngines[id]?.requestPause()
         }
+
+        /** Exponential backoff with a cap and small jitter to avoid thundering-herd retries. */
+        private fun computeBackoffMillis(retryCount: Int): Long {
+            val shift = (retryCount - 1).coerceIn(0, 10)
+            val base = 15_000L * (1L shl shift)
+            val capped = base.coerceAtMost(20 * 60_000L)
+            return capped + Random.nextLong(0, 5000)
+        }
     }
 
     private val serviceClient by lazy {
+        val dispatcher = Dispatcher().apply {
+            maxRequests = 12
+            maxRequestsPerHost = 8
+        }
         OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
+            .dispatcher(dispatcher)
+            .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .build()
     }
 
-    private var runningJobs = 0
+    private val runningJobs = AtomicInteger(0)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
@@ -57,14 +76,14 @@ class DownloadService : LifecycleService() {
                 Notifications.notificationId(id),
                 Notifications.progressNotification(this, "Starting…", 0, 0, 0, id)
             )
-            runningJobs++
+            runningJobs.incrementAndGet()
             lifecycleScope.launch {
                 try {
                     runDownload(id)
                 } finally {
-                    runningJobs--
+                    val remaining = runningJobs.decrementAndGet()
                     QueueManager.tryStartNext(applicationContext)
-                    if (runningJobs <= 0) {
+                    if (remaining <= 0) {
                         stopForeground(Service.STOP_FOREGROUND_REMOVE)
                         stopSelf()
                     }
@@ -105,6 +124,7 @@ class DownloadService : LifecycleService() {
         )
         repo.update(download)
 
+        PowerHolder.acquire(applicationContext)
         val result = try {
             engine.runCycle(download) { totalDownloaded, cycleUsed, speed ->
                 val current = repo.getById(id) ?: return@runCycle
@@ -125,6 +145,7 @@ class DownloadService : LifecycleService() {
             }
         } finally {
             activeEngines.remove(id)
+            PowerHolder.release()
         }
 
         val latest = repo.getById(id) ?: return
@@ -175,19 +196,7 @@ class DownloadService : LifecycleService() {
                 repo.update(latest.copy(status = DownloadStatus.PAUSED_MANUAL, updatedAt = System.currentTimeMillis()))
             }
             is DownloadEngine.CycleResult.Error -> {
-                val nextRetryCount = latest.retryCount + 1
-                if (nextRetryCount <= 3) {
-                    val delayMs = 10_000L * nextRetryCount
-                    repo.update(
-                        latest.copy(
-                            status = DownloadStatus.RETRYING,
-                            retryCount = nextRetryCount,
-                            errorMessage = result.message,
-                            updatedAt = System.currentTimeMillis()
-                        )
-                    )
-                    Scheduler.scheduleCycle(applicationContext, id, delayMs)
-                } else {
+                if (result.isPermanent) {
                     repo.update(
                         latest.copy(
                             status = DownloadStatus.FAILED,
@@ -196,6 +205,29 @@ class DownloadService : LifecycleService() {
                         )
                     )
                     if (prefs.notificationsEnabled) Notifications.showFailed(this, latest.fileName, result.message, id)
+                } else {
+                    val nextRetryCount = latest.retryCount + 1
+                    if (nextRetryCount <= MAX_TRANSIENT_RETRIES) {
+                        val delayMs = result.retryAfterMillis ?: computeBackoffMillis(nextRetryCount)
+                        repo.update(
+                            latest.copy(
+                                status = DownloadStatus.RETRYING,
+                                retryCount = nextRetryCount,
+                                errorMessage = result.message,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                        Scheduler.scheduleCycle(applicationContext, id, delayMs)
+                    } else {
+                        repo.update(
+                            latest.copy(
+                                status = DownloadStatus.FAILED,
+                                errorMessage = result.message,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                        if (prefs.notificationsEnabled) Notifications.showFailed(this, latest.fileName, result.message, id)
+                    }
                 }
             }
         }

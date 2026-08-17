@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -21,6 +20,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -69,21 +69,32 @@ fun AddDownloadScreen(
 
     val analyzeState by viewModel.analyzeState.collectAsState()
 
-    Scaffold(topBar = {
-        TopAppBar(
-            title = { Text("Add download") },
-            navigationIcon = {
-                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) }
-            }
-        )
-    }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Add download") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, null)
+                    }
+                }
+            )
+        }
+    ) { padding ->
         Column(
-            modifier = Modifier.padding(padding).padding(20.dp).fillMaxSize().verticalScroll(rememberScrollState()),
+            modifier = Modifier
+                .padding(padding)
+                .padding(20.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             OutlinedTextField(
                 value = url,
-                onValueChange = { url = it; viewModel.resetAnalyze() },
+                onValueChange = {
+                    url = it
+                    viewModel.resetAnalyze()
+                },
                 label = { Text("Download URL") },
                 placeholder = { Text("https://example.com/file.zip") },
                 singleLine = true,
@@ -111,27 +122,61 @@ fun AddDownloadScreen(
             when (val state = analyzeState) {
                 is AnalyzeUiState.Success -> {
                     val r = state.result
+
                     Card(
                         shape = MaterialTheme.shapes.medium,
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Filename", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(r.fileName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            Text("Size", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Text(
-                                if (r.totalBytes > 0) Formatters.formatBytes(r.totalBytes) else "Unknown",
+                                "Filename",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Text(
+                                r.fileName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+
+                            Text(
+                                "Size",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Text(
+                                if (r.totalBytes > 0) {
+                                    Formatters.formatBytes(r.totalBytes)
+                                } else {
+                                    "Unknown"
+                                },
                                 style = MaterialTheme.typography.bodyMedium
                             )
+
                             Text(
-                                if (r.supportsRange) "✓ Resumable downloading supported"
-                                else "⚠ Resume not confirmed by server",
+                                if (r.supportsRange) {
+                                    "✓ Resumable downloading supported"
+                                } else {
+                                    "⚠ Resume not confirmed by server"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (r.supportsRange) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary
+                                color = if (r.supportsRange) {
+                                    MaterialTheme.colorScheme.secondary
+                                } else {
+                                    MaterialTheme.colorScheme.tertiary
+                                }
                             )
                         }
                     }
                 }
+
                 is AnalyzeUiState.Error -> {
                     Text(
                         "Could not analyze URL: ${state.message}",
@@ -139,6 +184,7 @@ fun AddDownloadScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+
                 else -> {}
             }
 
@@ -151,31 +197,54 @@ fun AddDownloadScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Text("Cycle settings", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Cycle settings",
+                style = MaterialTheme.typography.titleSmall
+            )
 
             OutlinedTextField(
                 value = cycleAmountText,
-                onValueChange = { input -> cycleAmountText = input.filter { it.isDigit() || it == '.' } },
+                onValueChange = { input ->
+                    cycleAmountText = input.filter {
+                        it.isDigit() || it == '.'
+                    }
+                },
                 label = { Text("MB per cycle") },
                 placeholder = { Text("e.g. 3.5") },
                 singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal
+                ),
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
                 value = intervalText,
-                onValueChange = { input -> intervalText = input.filter { it.isDigit() } },
-                label = { Text(if (intervalUnit == IntervalUnit.MINUTES) "Minutes between cycles" else "Hours between cycles") },
+                onValueChange = { input ->
+                    intervalText = input.filter { it.isDigit() }
+                },
+                label = {
+                    Text(
+                        if (intervalUnit == IntervalUnit.MINUTES) {
+                            "Minutes between cycles"
+                        } else {
+                            "Hours between cycles"
+                        }
+                    )
+                },
                 singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = KeyboardType.Number
+                ),
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth()
             )
 
             Row(
-                modifier = Modifier.fillMaxWidth().selectableGroup(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 IntervalUnitOption(
@@ -184,6 +253,7 @@ fun AddDownloadScreen(
                     onSelect = { intervalUnit = IntervalUnit.MINUTES },
                     modifier = Modifier.weight(1f)
                 )
+
                 IntervalUnitOption(
                     label = "Hours",
                     selected = intervalUnit == IntervalUnit.HOURS,
@@ -195,30 +265,84 @@ fun AddDownloadScreen(
             val successState = analyzeState as? AnalyzeUiState.Success
             val cycleAmount = cycleAmountText.toFloatOrNull()
             val intervalValue = intervalText.toLongOrNull()
-            val formValid = url.isNotBlank() && successState != null &&
-                cycleAmount != null && cycleAmount > 0f &&
-                intervalValue != null && intervalValue > 0L
 
-            Button(
-                onClick = {
-                    val r: AnalyzeResult.Success? = successState?.result
-                    val fileName = customFileName.ifBlank { r?.fileName ?: FileUtils.extractFileNameFromUrl(url) }
-                    viewModel.addDownload(
-                        url = url.trim(),
-                        fileName = fileName,
-                        totalBytes = r?.totalBytes ?: -1L,
-                        supportsRange = r?.supportsRange ?: false,
-                        mimeType = r?.contentType,
-                        cycleAmountMb = cycleAmount ?: 100f,
-                        intervalValue = intervalValue ?: 24L,
-                        intervalUnit = intervalUnit
-                    )
-                    onDone()
-                },
-                enabled = formValid,
-                shape = MaterialTheme.shapes.medium,
+            val formValid = url.isNotBlank() &&
+                successState != null &&
+                cycleAmount != null &&
+                cycleAmount > 0f &&
+                intervalValue != null &&
+                intervalValue > 0L
+
+            fun startDownload(startImmediately: Boolean) {
+                val r: AnalyzeResult.Success? = successState?.result
+
+                val fileName = customFileName.ifBlank {
+                    r?.fileName ?: FileUtils.extractFileNameFromUrl(url)
+                }
+
+                viewModel.addDownload(
+                    url = url.trim(),
+                    fileName = fileName,
+                    totalBytes = r?.totalBytes ?: -1L,
+                    supportsRange = r?.supportsRange ?: false,
+                    mimeType = r?.contentType,
+                    cycleAmountMb = cycleAmount ?: 100f,
+                    intervalValue = intervalValue ?: 24L,
+                    intervalUnit = intervalUnit,
+                    startImmediately = startImmediately
+                )
+
+                onDone()
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Start download") }
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        startDownload(startImmediately = false)
+                    },
+                    enabled = formValid,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Start later")
+                }
+
+                Button(
+                    onClick = {
+                        startDownload(startImmediately = true)
+                    },
+                    enabled = formValid,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Start now")
+                }
+            }
+
+            if (formValid) {
+                val unitLabel =
+                    if (intervalUnit == IntervalUnit.MINUTES) {
+                        "minute"
+                    } else {
+                        "hour"
+                    }
+
+                val plural =
+                    if (intervalValue == 1L) {
+                        ""
+                    } else {
+                        "s"
+                    }
+
+                Text(
+                    "\"Start later\" begins the first cycle in $intervalValue $unitLabel$plural instead of right now",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Text(
                 "Saved to Download / Daily Chunk",
@@ -231,17 +355,36 @@ fun AddDownloadScreen(
 }
 
 @Composable
-private fun IntervalUnitOption(label: String, selected: Boolean, onSelect: () -> Unit, modifier: Modifier = Modifier) {
+private fun IntervalUnitOption(
+    label: String,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Row(
         modifier = modifier
-            .selectable(selected = selected, onClick = onSelect)
+            .selectable(
+                selected = selected,
+                onClick = onSelect
+            )
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RadioButton(selected = selected, onClick = onSelect)
-        Text(label, style = MaterialTheme.typography.bodyMedium)
+        RadioButton(
+            selected = selected,
+            onClick = onSelect
+        )
+
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
 private fun formatMb(value: Float): String =
-    if (value == value.toLong().toFloat()) value.toLong().toString() else value.toString()
+    if (value == value.toLong().toFloat()) {
+        value.toLong().toString()
+    } else {
+        value.toString()
+    }
