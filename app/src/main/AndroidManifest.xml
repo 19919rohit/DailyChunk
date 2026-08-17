@@ -4,13 +4,16 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
@@ -23,30 +26,44 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DailyChunk">
 
+        <!-- WorkManager foreground service for foreground downloads -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.DailyChunk">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
         </activity>
 
-        <!-- No custom download Service needed anymore: DownloadWorker promotes
-             itself to a foreground job via setForeground(), which WorkManager
-             backs with its own SystemForegroundService (merged automatically
-             from the androidx.work manifest). This is the sanctioned path for
-             starting foreground work from a background-triggered job on
-             Android 12+, and it's what fixed unreliable startup. -->
+        <!--
+            No custom download Service needed anymore.
+
+            DownloadWorker promotes itself to a foreground job via
+            setForeground(), which WorkManager backs with its own
+            SystemForegroundService.
+
+            This is the sanctioned path for starting foreground work
+            from a background-triggered job on Android 12+.
+        -->
 
         <receiver
             android:name=".work.BootReceiver"
             android:exported="true">
+
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
+
         </receiver>
 
         <provider
@@ -54,10 +71,13 @@
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
+
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
+
         </provider>
 
     </application>
+
 </manifest>
