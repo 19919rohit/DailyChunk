@@ -211,4 +211,80 @@ fun DownloadCard(
                     "${Formatters.formatBytes(download.downloadedBytes)} / " +
                         (if (download.totalBytes > 0) Formatters.formatBytes(download.totalBytes) else "?"),
                     style = MaterialTheme.typography.bodySmall,
-                    color =
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (download.totalBytes > 0) {
+                    Text(
+                        "${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            when (download.status) {
+                DownloadStatus.DOWNLOADING -> {
+                    Spacer(Modifier.height(12.dp))
+                    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Column {
+                                Text("This cycle", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    "${Formatters.formatBytes(download.cycleUsedBytes)} / ${Formatters.formatBytes(download.cycleLimitBytes)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Text(
+                                Formatters.formatSpeed(download.lastSpeedBps),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+                DownloadStatus.WAITING_NEXT_CYCLE -> {
+                    Spacer(Modifier.height(10.dp))
+                    val remaining = (download.nextCycleAtMillis - now).coerceAtLeast(0)
+                    Text(
+                        "Daily limit reached — resumes in ${Formatters.formatDuration(remaining)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DownloadStatus.FAILED -> {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        download.errorMessage ?: "Failed",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                DownloadStatus.RETRYING -> {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        download.errorMessage ?: "Retrying…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+                else -> {}
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                when (download.status) {
+                    DownloadStatus.DOWNLOADING -> TextButton(onClick = onPause) { Text("Pause") }
+                    DownloadStatus.PAUSED_MANUAL, DownloadStatus.FAILED -> TextButton(onClick = onResume) { Text("Resume") }
+                    DownloadStatus.WAITING_NEXT_CYCLE -> TextButton(onClick = onResume) { Text("Start now") }
+                    else -> {}
+                }
+            }
+        }
+    }
+}
