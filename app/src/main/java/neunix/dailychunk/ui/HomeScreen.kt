@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -101,22 +100,11 @@ fun HomeScreen(
 
 @Composable
 private fun HomeHeader(activeCount: Int) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Text("DailyChunk", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.clickable { neunix.dailychunk.util.AppLinks.openRepo(context) }
-            ) {
-                Text(
-                    "Open Source",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                )
-            }
+            
         }
         Spacer(Modifier.height(2.dp))
         Text(
