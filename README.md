@@ -1,7 +1,7 @@
 # DailyChunk
 
 **Big downloads. Small daily chunks.**
-
+![DailyChunk](images/1.png)
 DailyChunk is a free, open source download manager for Android, built for people with limited or metered mobile data.
 
 Got a 4 GB file to download but only 100 MB of spare data a day? Paste the link, tell DailyChunk how much it's allowed to download each cycle, and walk away. It downloads your allowance, stops automatically, waits, and picks up right where it left off — every day, until the file is complete. No manual restarting, no babysitting, no wasted data.
